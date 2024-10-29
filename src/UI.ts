@@ -56,7 +56,6 @@ export class Select {
         module.element.appendChild(this.element);
 
         this.select?.addEventListener('change', function handleChange(event: any) {
-            console.log(event.target.value);
             callback(event.target.value);
         });
     }
@@ -90,7 +89,6 @@ export class Toggle {
         module.element.appendChild(this.element);
 
         this.checkbox?.addEventListener('change', function handleChange(event: any) {
-            console.log(event.target.checked);
             callback(event.target.checked);
         });
 

@@ -255,17 +255,14 @@ function createConnection(sourcePort: OutputPort, targetPort: InputPort) {
     svg?.appendChild(path);
     updateConnectionPath(connection);
     sourcePort.module.updateConnected();
-    console.log(globals.connections)
 }
 
 
 
 // Handle module dragging
 document.addEventListener('mousedown', (e) => {
-    console.log("pressed body")
     const element = document.elementFromPoint(e.clientX, e.clientY)
     if (element === document.body) {
-        console.log("set active module null")
         globals.activeModule = null;
         updateActiveModule()
     }

@@ -253,7 +253,6 @@ export class VCAModule extends Module {
     }
 
     onClick(e: MouseEvent): void {
-        console.log(this)
     }
 
 
@@ -441,7 +440,6 @@ export class ADSRModule extends Module {
     handleTrigger(on: boolean) {
         const now = this.globals.audioContext.currentTime;
         if (on) {
-            console.log("Trigger On")
             // Apply attack
             this.gainNode.gain.cancelScheduledValues(now);
             //this.gainNode.gain.setValueAtTime(0, now);
@@ -449,8 +447,6 @@ export class ADSRModule extends Module {
             // Apply decay
             this.gainNode.gain.linearRampToValueAtTime(this.sustainLevel, now + this.attackTime + this.decayTime);
         } else {
-            console.log("Trigger Off")
-
             // Apply release
             this.gainNode.gain.cancelScheduledValues(now);
             //this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
@@ -514,6 +510,5 @@ export class VCFModule extends Module {
     }
 
     onClick(e: MouseEvent): void {
-        console.log(this);
     }
 }
