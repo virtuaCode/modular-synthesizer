@@ -1,0 +1,185 @@
+body {
+  margin: 0;
+  background: #1e1e2e;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+.module {
+  position: absolute;
+  width: 120px;
+  background: #313244;
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: move;
+  user-select: none;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  color: #cdd6f4;
+}
+
+.module.active {
+  box-shadow: inset 0 0 0 2px #89b4fa;
+}
+
+.module h3 {
+  color: #cdd6f4;
+  font-size: 14px;
+  text-align: center;
+}
+
+.port {
+  width: 12px;
+  height: 12px;
+  background: #89b4fa;
+  border-radius: 50%;
+  margin: 5px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.port:hover {
+  background: #b4befe;
+}
+
+.port.cv-port {
+  background: #F28C33;
+}
+
+.port.cv-port:hover {
+  background: #ffad65;
+}
+
+.port.gate-port {
+  background: #b514ff;
+}
+
+.port.gate-port:hover {
+  background: #c851ff;
+}
+
+.input-port {
+  float: left;
+}
+
+.output-port {
+  float: right;
+}
+
+.connection.audio {
+  stroke: #89b4fa;
+  stroke-width: 2;
+  fill: none;
+}
+
+.connection.audio.active {
+  stroke: #b4befe;
+  stroke-width: 3;
+}
+
+.connection.cv {
+  stroke: #ffa724;
+  stroke-width: 2;
+  fill: none;
+}
+
+.connection.cv.active {
+  stroke: #ffbf10;
+  stroke-width: 3;
+}
+
+.connection.gate {
+  stroke: #b514ff;
+  stroke-width: 2;
+  fill: none;
+}
+
+.connection.gate.active {
+  stroke: #c851ff;
+  stroke-width: 3;
+}
+
+.module input {
+  width: 90%;
+  background: #45475a;
+  border: none;
+  color: #cdd6f4;
+  padding: 4px;
+  margin: 4px auto;
+  display: block;
+  border-radius: 4px;
+}
+
+#toolbar {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  background: #313244;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+#connections {
+  z-index: 1;
+  position: relative;
+  pointer-events: none;
+}
+
+button {
+  background: #89b4fa;
+  border: none;
+  padding: 8px 16px;
+  color: #1e1e2e;
+  border-radius: 4px;
+  cursor: pointer;
+  margin: 0 4px;
+}
+
+button:hover {
+  background: #b4befe;
+}
+
+.knob {
+  width: 50px;
+  height: 50px;
+  background: #89b4fa;
+  border-radius: 50%;
+  margin: 10px auto;
+  position: relative;
+  cursor: pointer;
+  transform: rotate(0deg);
+}
+
+.knob::after {
+  content: '';
+  position: absolute;
+  width: 2px;
+  height: 20px;
+  background: #fff;
+  left: 50%;
+  top: 5px;
+}
+
+.knob-container .label {
+  text-align: center;
+}
+
+.knob-container .label {
+  text-align: center;
+  margin: 1rem auto;
+}
+
+.select-container {
+  display: flex;
+  flex-direction: column;
+  margin: 1rem auto;
+}
+
+.select-container .label {
+  margin: 1rem auto;
+}
+
+.button-container {
+  display: flex;
+  flex-direction: column;
+  margin: 1rem auto;
+}

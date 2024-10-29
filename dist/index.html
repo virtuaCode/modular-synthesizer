@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="." />
+  <title>Modular Synthesizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <svg id="connections"></svg>
+  <div id="toolbar">
+    <button onclick="start()">Setup</button>
+    <button onclick="addMIDIModule()">Add MIDI</button>
+    <button onclick="addOSCModule()">Add OSC</button>
+    <button onclick="addLFOModule()">Add LFO</button>
+    <button onclick="addVCAModule()">Add VCA</button>
+    <button onclick="addVCFModule()">Add VCF</button>
+    <button onclick="addADSRModule()">Add ADSR</button>
+    <button onclick="addMixerModule()">Add Mixer</button>
+    <button onclick="addSpeakerModule()">Add speaker</button>
+  </div>
+
+
+  <template id="template-button">
+    <div class="button-container">
+      <button type="button"></button>
+    </div>
+  </template>
+
+  <template id="template-knob">
+    <div class="knob-container">
+      <div class="label"></div>
+      <div class="knob"></div>
+    </div>
+  </template>
+
+  <template id="template-select">
+    <div class="select-container">
+      <div class="label"></div>
+      <select></select>
+    </div>
+  </template>
+
+  <template id="template-toggle">
+    <div class="toggle-container">
+      <div class="label"></div>
+      <input type="checkbox" name="toggle">
+    </div>
+  </template>
+  <script src="bundle.js"></script>
+</body>
+
+</html>
