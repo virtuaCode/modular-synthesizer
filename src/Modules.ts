@@ -45,7 +45,7 @@ export abstract class Module implements RecordType {
     inputConnections: Connection[]
 
 
-    constructor(public readonly globals: Globals, type: string, x: number, y: number) {
+    constructor(public readonly globals: Globals, private readonly type: string, x: number, y: number) {
         this.x = x;
         this.y = y;
         this.id = 'module-' + self.crypto.randomUUID();
@@ -110,7 +110,7 @@ export abstract class Module implements RecordType {
     serialize(): { [key: string]: string | number } {
         return {
             id: this.id,
-            type: this.constructor.name,
+            type: this.type,
             x: this.x,
             y: this.y
         }
@@ -118,34 +118,31 @@ export abstract class Module implements RecordType {
 
     static fromJSON(globals: Globals, m: any) {
         switch (m.type) {
-            case "MultiplierModule":
+            case "multiplier":
                 return new MultiplierModule(globals, m.x, m.y, m.amount)
 
-            case "LFOModule":
+            case "lfo":
                 return new LFOModule(globals, m.x, m.y, m.frequency, m.gain, m.oscType)
 
-            case "OSCModule":
+            case "osc":
                 return new OSCModule(globals, m.x, m.y, m.frequency, m.detune, m.gain, m.oscType)
 
-            case "VCAModule":
+            case "vca":
                 return new VCAModule(globals, m.x, m.y, m.gain)
 
-            case "MixerModule":
+            case "mixer":
                 return new MixerModule(globals, m.x, m.y, m.gain)
 
-            case "MultiplierModule":
-                return new MultiplierModule(globals, m.x, m.y, m.amount)
-
-            case "SpeakerModule":
+            case "speaker":
                 return new SpeakerModule(globals, m.x, m.y)
 
-            case "MIDIModule":
+            case "midi":
                 return new MIDIModule(globals, m.x, m.y)
 
-            case "ADSRModule":
+            case "adsr":
                 return new ADSRModule(globals, m.x, m.y, m.attack, m.decay, m.sustain, m.release)
 
-            case "VCFModule":
+            case "vcf":
                 return new VCFModule(globals, m.x, m.y, m.frequency, m.resonance)
 
             default:
