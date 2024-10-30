@@ -24,7 +24,8 @@ export abstract class Port {
 
     constructor(
         public module: Module, 
-        public readonly title: string
+        public readonly title: string,
+        public readonly id: string,
     ) {
         this.port = document.createElement('div') as PortElement;
         this.port.className = 'port';
@@ -86,22 +87,22 @@ export abstract class Port {
 }
 
 export abstract class InputPort extends Port{
-    constructor(module: Module, title: string, public readonly target: Target) {
-        super(module, title)
+    constructor(module: Module, title: string, id: string, public readonly target: Target) {
+        super(module, title, id)
         this.port.className += ' input-port'
     }
 }
 
 export abstract class OutputPort extends Port{
-    constructor(module: Module, title: string, public readonly source: Source) {
-        super(module, title)
+    constructor(module: Module, title: string, id: string, public readonly source: Source) {
+        super(module, title, id)
         this.port.className += ' output-port'
     }
 }
 
 export class CVInputPort extends InputPort {
-    constructor(module: Module, title: string, target: Target) {
-        super(module, title, target);
+    constructor(module: Module, title: string, id: string, target: Target) {
+        super(module, title, id, target);
         this.port.className += ' cv-port'
     }
 
@@ -113,8 +114,8 @@ export class CVInputPort extends InputPort {
 }
 
 export class CVOutputPort extends OutputPort {
-    constructor(module: Module, title: string, source: Source) {
-        super(module, title, source);
+    constructor(module: Module, title: string, id: string, source: Source) {
+        super(module, title, id, source);
         this.port.className += ' cv-port';
         
     }
@@ -125,8 +126,8 @@ export class CVOutputPort extends OutputPort {
 }
 
 export class GateInputPort extends InputPort {
-    constructor(module: Module, title: string, target: GateNode) {
-        super(module, title, target);
+    constructor(module: Module, title: string, id: string, target: GateNode) {
+        super(module, title, id, target);
         this.port.className += ' gate-port'
     }
 
@@ -138,8 +139,8 @@ export class GateInputPort extends InputPort {
 }
 
 export class GateOutputPort extends OutputPort {
-    constructor(module: Module, title: string, source: GateNode) {
-        super(module, title, source);
+    constructor(module: Module, title: string, id: string, source: GateNode) {
+        super(module, title, id, source);
         this.port.className += ' gate-port';
         
     }
@@ -152,8 +153,8 @@ export class GateOutputPort extends OutputPort {
 
 
 export class AudioInputPort extends InputPort {
-    constructor(module: Module, title: string, target: Target) {
-        super(module, title, target);
+    constructor(module: Module, title: string, id: string, target: Target) {
+        super(module, title, id, target);
         this.port.className += ' audio-port'
     }
 
@@ -163,8 +164,8 @@ export class AudioInputPort extends InputPort {
 }
 
 export class AudioOutputPort extends OutputPort {
-    constructor(module: Module, title: string, source: Source) {
-        super(module, title, source);
+    constructor(module: Module, title: string, id: string, source: Source) {
+        super(module, title, id, source);
         this.port.className += ' audio-port'
     }
 

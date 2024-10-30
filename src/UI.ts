@@ -1,5 +1,9 @@
 import { Module } from "./Modules";
 
+export interface HasValue {
+    getValue(): number | string 
+}
+
 export class Button {
     element: HTMLElement
 
@@ -24,13 +28,62 @@ export class Button {
     }
 }
 
-export class Select {
+export class TextInput implements HasValue {
+    element: HTMLElement
+    label: HTMLElement | null
+    input: HTMLInputElement | null
+
+    constructor(module: Module, name: string, value: string, onChange: (e: Event) => any) {
+        let temp = document.getElementById("template-input") as HTMLTemplateElement;
+
+        if (temp === null)
+            throw new Error("template input not found");
+
+        this.element = temp.content.cloneNode(true) as HTMLElement;
+
+        this.label = this.element.querySelector(".label");
+
+        if (this.label === null)
+            throw new Error("label is not defined");
+
+        this.label.textContent = name;
+
+        this.input = this.element.querySelector("input")
+
+        this.input?.addEventListener('change', onChange.bind(this));
+        this.input?.addEventListener('keydown', (e: KeyboardEvent) => {
+            e.stopPropagation()
+        })
+        this.input?.addEventListener('mousemove', (e: MouseEvent) => {
+            e.stopPropagation()
+        })
+
+        this.setValue(value)
+        module.element.appendChild(this.element);
+    }
+    getValue(): number | string {
+        if (this.input)
+            return this.input.value;
+        else 
+            return ""
+    }
+
+    setValue(value: string) {
+        if (this.input)
+            this.input.value = value
+
+        const event = new Event('change', { bubbles: true });
+        this.input?.dispatchEvent(event)
+    }
+}
+
+export class Select implements HasValue {
     element: HTMLElement
     select: HTMLSelectElement | null
     label: HTMLDivElement | null
 
 
-    constructor(module: Module, name: string, value: Map<OscillatorType, string>, callback: (v: OscillatorType) => any) {
+    constructor(module: Module, name: string, values: Map<OscillatorType, string>, value: OscillatorType, callback: (v: OscillatorType) => any) {
         let temp = document.getElementById("template-select") as HTMLTemplateElement;
 
         if (temp === null)
@@ -39,12 +92,15 @@ export class Select {
         this.element = temp.content.cloneNode(true) as HTMLElement;
         this.select = this.element.querySelector("select");
 
-        for(const key of Array.from(value.keys())) {
+        for(const key of Array.from(values.keys())) {
             const option = document.createElement('option')
             option.value = key
-            option.textContent = value.get(key) || ""
+            option.textContent = values.get(key) || ""
             this.select?.appendChild(option)
         }
+
+        if (this.select)
+            this.select.value = value
 
         this.label = this.element.querySelector(".label");
 
@@ -58,6 +114,14 @@ export class Select {
         this.select?.addEventListener('change', function handleChange(event: any) {
             callback(event.target.value);
         });
+        callback(value)
+    }
+
+    getValue(): number | string {
+        if (this.select)
+            return this.select.value
+        else 
+            return ""
     }
 }
 
@@ -97,10 +161,11 @@ export class Toggle {
     }
 }
 
-export class Knob {
+export class Knob implements HasValue{
     rotating: boolean;
     startY: number;
     startRotation: number;
+    value: number;
     element: HTMLElement;
     knob: HTMLElement | null;
     label: HTMLElement | null;
@@ -110,6 +175,7 @@ export class Knob {
         this.rotating = false;
         this.startRotation = value * 300;
         this.startY = 0;
+        this.value = value;
         let temp = document.getElementById("template-knob") as HTMLTemplateElement;
 
         if (temp === null)
@@ -151,8 +217,8 @@ export class Knob {
                 this.knob.style.transform = `rotate(${rotation}deg)`;
 
                 // Update audio parameters
-                const value = rotation / 300;
-                callback(value);
+                this.value = rotation / 300;
+                callback(this.value);
                 e.stopPropagation();
             }
         });
@@ -168,11 +234,15 @@ export class Knob {
         if (this.knob === null)
             throw new Error("knob is not defined");
 
-
         const rotation = value * 300;
+        
         this.knob.style.transform = `rotate(${rotation}deg)`;
-
+        this.value = value
         // Update audio parameters
         this.callback(value);
+    }
+
+    getValue(): number | string {
+        return this.value
     }
 }

@@ -14,16 +14,19 @@ export class Connection {
     remove() {
         try {
             // Only disconnect if the target is an AudioNode or AudioParam
-            if (this.targetPort.target instanceof AudioNode) {
-                this.sourcePort.source.disconnect(this.targetPort.target);
-            } else if (this.targetPort.target instanceof AudioParam) {
-                this.sourcePort.source.disconnect(this.targetPort.target);
-            } else if (this.targetPort.target instanceof GateNode) {
-                this.sourcePort.source.disconnect(this.targetPort.target)
-            }
+            this.sourcePort.source.disconnect(this.targetPort.target);
         } catch (e) {
             // Ignore disconnect errors - the connection may already be disconnected
             console.log("Connection already disconnected");
+        }
+    }
+
+    serialize() {
+        return {
+            sourceId: this.sourcePort.module.id,
+            targetId: this.targetPort.module.id,
+            source: this.sourcePort.id,
+            target: this.targetPort.id
         }
     }
 }

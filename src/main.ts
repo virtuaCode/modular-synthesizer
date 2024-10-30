@@ -1,8 +1,6 @@
 import { Connection, safeDisconnect } from "./Connection";
-import { VCAModule, OSCModule, SpeakerModule, updateConnectionPath, Module, Globals, MixerModule, LFOModule, MIDIModule, ADSRModule, VCFModule } from "./Modules";
+import { VCAModule, OSCModule, SpeakerModule, updateConnectionPath, Module, Globals, MixerModule, LFOModule, MIDIModule, ADSRModule, VCFModule, MultiplierModule } from "./Modules";
 import { Port, PortElement, OutputPort, AudioOutputPort, AudioInputPort, CVOutputPort, CVInputPort, InputPort, GateInputPort, GateOutputPort } from "./Ports";
-
-
 
 export const globals: Globals = {
     modules: [],
@@ -62,6 +60,14 @@ export const globals: Globals = {
     return module;
 };
 
+(window as any).addMultiplierModule = () => {
+    const module = new MultiplierModule(globals, 100, 100);
+    globals.modules.push(module);
+    return module;
+};
+
+
+
 export function startConnection(port: Port) {
     globals.connectingPort = port;
 
@@ -116,25 +122,29 @@ export function deleteModule(globals: Globals) {
     });
 
     // Remove all output connections
-    module.outputConnections.forEach(connection => {
+    module.outputConnections.forEach(output => {
         try {
             // Safely disconnect audio nodes
-            if (connection.sourcePort.source && connection.targetPort.target) {
-                safeDisconnect(connection.sourcePort.source, connection.targetPort.target);
+            if (output.sourcePort.source && output.targetPort.target) {
+                safeDisconnect(output.sourcePort.source, output.targetPort.target);
             }
 
             // Remove from target module's inputs
-            const targetModule = connection.targetPort.module;
-            const input = targetModule.inputConnections.find(input => input === connection);
+            const targetModule = output.targetPort.module;
+            const inputIdx = targetModule.inputConnections.indexOf(output)
+
+            if (inputIdx !== -1) {
+                targetModule.inputConnections.splice(inputIdx, 1);
+            }
 
             // Remove from globals connections
-            const globalIdx = globals.connections.indexOf(connection);
+            const globalIdx = globals.connections.indexOf(output);
             if (globalIdx !== -1) {
                 globals.connections.splice(globalIdx, 1);
             }
 
             // Remove the SVG path
-            connection.path.remove();
+            output.path.remove();
         } catch (e) {
             console.log("Error removing output connection:", e);
         }
@@ -174,7 +184,7 @@ export function updateTempConnection(e: MouseEvent) {
     svg?.appendChild(path);
 }
 
-function finishConnection(e: MouseEvent) {
+export function finishConnection(e: MouseEvent) {
     document.removeEventListener('mousemove', updateTempConnection);
     document.removeEventListener('mouseup', finishConnection);
 
@@ -216,7 +226,50 @@ function finishConnection(e: MouseEvent) {
     globals.connectingPort = null;
 }
 
-function createConnection(sourcePort: OutputPort, targetPort: InputPort) {
+export function removeConnection(connection: Connection, globals: Globals) {
+    // Safely disconnect audio nodes
+    const sourcePort = connection.sourcePort;
+    const targetPort = connection.targetPort;
+    if (sourcePort.source && targetPort.target) {
+        safeDisconnect(sourcePort.source, targetPort.target);
+    }
+
+    // Remove from source module's output connections
+    const sourceModule = sourcePort.module;
+    const sourceModuleIdx = sourceModule.outputConnections.indexOf(connection);
+    if (sourceModuleIdx !== -1) {
+        sourceModule.outputConnections.splice(sourceModuleIdx, 1);
+    }
+
+    // Remove from target module's input connections
+    const targetModule = targetPort.module;
+    const targetModuleIdx = targetModule.inputConnections.indexOf(connection);
+    if (targetModuleIdx !== -1) {
+        targetModule.inputConnections.splice(targetModuleIdx, 1);
+    }
+
+    // Remove from globals connections
+    const globalIdx = globals.connections.indexOf(connection);
+    if (globalIdx !== -1) {
+        globals.connections.splice(globalIdx, 1);
+    }
+
+    // Remove the SVG path
+    connection.path.remove();
+}
+
+export function handleConnectionRemoval(port: Port, globals: Globals) {
+    if (port instanceof InputPort) {
+        // Find the input object for this port
+        const connection = port.module.inputConnections.find((input) => input.targetPort === port);
+        if (connection) {
+            removeConnection(connection, globals);
+        }
+    }
+}
+
+
+export function createConnection(sourcePort: OutputPort, targetPort: InputPort) {
     const svg = document.getElementById('connections');
     const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     path.setAttribute('class', 'connection ' + sourcePort.category);
@@ -232,22 +285,8 @@ function createConnection(sourcePort: OutputPort, targetPort: InputPort) {
         targetPort
     );
 
-    // Find the input object for the target port
-    const targetInput = targetPort.module.inputConnections.find(input => input.targetPort === targetPort);
-    if (targetInput) {
-        const idx = globals.connections.indexOf(targetInput);
-        if (idx !== -1) {
-            globals.connections.splice(idx, 1);
-            targetInput.remove()
-            targetInput.path.remove();
+    handleConnectionRemoval(targetPort, globals);
 
-            // Remove the existing connection from the target module's input connections
-            const targetModuleIdx = targetPort.module.inputConnections.indexOf(targetInput);
-            if (targetModuleIdx !== -1) {
-                targetPort.module.inputConnections.splice(targetModuleIdx, 1);
-            }
-        }
-    }
 
     sourcePort.module.outputConnections.push(connection);
     targetPort.module.inputConnections.push(connection);
@@ -256,7 +295,6 @@ function createConnection(sourcePort: OutputPort, targetPort: InputPort) {
     updateConnectionPath(connection);
     sourcePort.module.updateConnected();
 }
-
 
 
 // Handle module dragging
@@ -310,8 +348,18 @@ export async function initializeMIDI() {
 
 function handleMIDIMessage(event: WebMidi.MIDIMessageEvent) {
     const [command, note, velocity] = event.data;
+    const cmd = command & 0xF0;
 
     const midiModule = globals.modules.find(m => m instanceof MIDIModule) as MIDIModule;
+
+    // Check if the message is a pitch bend message
+    if (cmd === 0xE0) {
+        const channel = command & 0x0F;
+        const pitchBendValue = ((velocity << 7) | note) - 8192; // Centered at 0
+        
+        midiModule.handlePitchBend(pitchBendValue, channel);
+    }
+
     if (midiModule) {
         if (command === 0x90 && velocity > 0) { // Note on
             midiModule.handleNoteOn(note, velocity);
@@ -322,7 +370,7 @@ function handleMIDIMessage(event: WebMidi.MIDIMessageEvent) {
 }
 
 
-document.addEventListener("DOMContentLoaded", function(){
+document.addEventListener("DOMContentLoaded", function () {
     window.addEventListener('resize', updateSVGSize);
     updateSVGSize();
 });
@@ -331,20 +379,59 @@ document.addEventListener("DOMContentLoaded", function(){
     initializeMIDI();
     const midi = (window as any).addMIDIModule() as MIDIModule
     midi.updatePosition(10, 100)
+    const mult = (window as any).addMultiplierModule() as MultiplierModule
+    mult.updatePosition(200, 640)
+    mult.select.setValue("200")
     const adsr = (window as any).addADSRModule() as ADSRModule
-    adsr.updatePosition(10, 250)
+    adsr.updatePosition(200, 100)
     const osc = (window as any).addOSCModule() as OSCModule
-    osc.updatePosition(200, 100)
+    osc.updatePosition(400, 100)
     const vca = (window as any).addVCAModule() as VCAModule
-    vca.updatePosition(400, 100);
+    vca.updatePosition(600, 100);
     const speaker = (window as any).addSpeakerModule() as SpeakerModule
-    speaker.updatePosition(600, 100);
+    speaker.updatePosition(800, 100);
 
     createConnection(adsr.envelopeOutput, vca.cvInput)
+    createConnection(midi.pitchBendOutput, mult.cvInput)
+    createConnection(mult.cvOutput, osc.detuneInput)
     createConnection(midi.gateOutput, adsr.gateInput)
     createConnection(midi.pitchOutput, osc.pitchInput)
     createConnection(osc.audioOutput, vca.audioInput)
     createConnection(vca.audioOutput, speaker.audioInput)
+};
 
-    vca.knob.setValue(0)
+(window as any).save = function save() {
+    const modules = globals.modules.map(m => m.serialize())
+    const connections = globals.connections.map(c => c.serialize())
+    const json = JSON.stringify({modules, connections}, null, 4)
+    localStorage.setItem("saved-setup", json)
+    console.log(json)
+};
+
+
+(window as any).load = function load() {
+    initializeMIDI();
+
+    const json = localStorage.getItem("saved-setup")
+
+    if (json) {
+        const saved = JSON.parse(json)
+        const modules = saved.modules;
+        const connections = saved.connections;
+
+        for (const module of modules) {
+            const m = Module.fromJSON(globals, module)
+            m.id = module.id;
+            globals.modules.push(m)
+        }
+
+        for (const connection of connections) {
+            const mSource = globals.modules.find((m: Module) => m.id === connection.sourceId)
+            const mTarget = globals.modules.find((m: Module) => m.id === connection.targetId)
+            
+            if (mSource && mTarget) {                
+                createConnection((mSource as any)[connection.source], (mTarget as any) [connection.target])
+            }
+        }
+    }
 }

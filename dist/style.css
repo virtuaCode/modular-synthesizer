@@ -1,3 +1,11 @@
+:root {
+  --red: #ef476f;
+  --blue: #1b9aaa;
+  --yellow: #ffc43d;
+  --primary: #7474b9;
+  --primary-light: #a2a2ff;
+}
+
 body {
   margin: 0;
   background: #1e1e2e;
@@ -14,23 +22,27 @@ body {
   cursor: move;
   user-select: none;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  color: #cdd6f4;
+  color: var(--primary-light);
 }
 
 .module.active {
-  box-shadow: inset 0 0 0 2px #89b4fa;
+  box-shadow: inset 0 0 0 2px var(--primary);
 }
 
 .module h3 {
-  color: #cdd6f4;
-  font-size: 14px;
+  margin-top: 1rem;
+  color: var(--primary-light);
+  font-size: 18px;
   text-align: center;
+  border-bottom: 1px;
+  border-bottom-style: solid;
+  padding-bottom: 1rem;
 }
 
 .port {
   width: 12px;
   height: 12px;
-  background: #89b4fa;
+  background: var(--blue);
   border-radius: 50%;
   margin: 5px;
   cursor: pointer;
@@ -38,23 +50,23 @@ body {
 }
 
 .port:hover {
-  background: #b4befe;
+  background: var(--blue);
 }
 
 .port.cv-port {
-  background: #F28C33;
+  background: var(--yellow);
 }
 
 .port.cv-port:hover {
-  background: #ffad65;
+  background: var(--yellow);
 }
 
 .port.gate-port {
-  background: #b514ff;
+  background: var(--red);
 }
 
 .port.gate-port:hover {
-  background: #c851ff;
+  background: var(--red);
 }
 
 .input-port {
@@ -66,35 +78,35 @@ body {
 }
 
 .connection.audio {
-  stroke: #89b4fa;
+  stroke: var(--blue);
   stroke-width: 2;
   fill: none;
 }
 
 .connection.audio.active {
-  stroke: #b4befe;
+  stroke: var(--blue);
   stroke-width: 3;
 }
 
 .connection.cv {
-  stroke: #ffa724;
+  stroke: var(--yellow);
   stroke-width: 2;
   fill: none;
 }
 
 .connection.cv.active {
-  stroke: #ffbf10;
+  stroke: var(--yellow);
   stroke-width: 3;
 }
 
 .connection.gate {
-  stroke: #b514ff;
+  stroke: var(--red);
   stroke-width: 2;
   fill: none;
 }
 
 .connection.gate.active {
-  stroke: #c851ff;
+  stroke: var(--red);
   stroke-width: 3;
 }
 
@@ -102,7 +114,18 @@ body {
   width: 90%;
   background: #45475a;
   border: none;
-  color: #cdd6f4;
+  color: var(--primary-light);
+  padding: 4px;
+  margin: 4px auto;
+  display: block;
+  border-radius: 4px;
+}
+
+.module select {
+  width: 90%;
+  background: #45475a;
+  border: none;
+  color: var(--primary-light);
   padding: 4px;
   margin: 4px auto;
   display: block;
@@ -125,7 +148,7 @@ body {
 }
 
 button {
-  background: #89b4fa;
+  background: var(--primary);
   border: none;
   padding: 8px 16px;
   color: #1e1e2e;
@@ -135,13 +158,13 @@ button {
 }
 
 button:hover {
-  background: #b4befe;
+  background: var(--primary-light);
 }
 
 .knob {
   width: 50px;
   height: 50px;
-  background: #89b4fa;
+  background: var(--primary);
   border-radius: 50%;
   margin: 10px auto;
   position: relative;
@@ -175,6 +198,16 @@ button:hover {
 }
 
 .select-container .label {
+  margin: 1rem auto;
+}
+
+.input-container {
+  display: flex;
+  flex-direction: column;
+  margin: 1rem auto;
+}
+
+.input-container .label {
   margin: 1rem auto;
 }
 

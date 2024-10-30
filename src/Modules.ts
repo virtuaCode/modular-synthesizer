@@ -1,10 +1,10 @@
 import { Connection } from "./Connection";
-import { Button, Knob, Select, Toggle } from "./UI";
+import { Button, TextInput, Knob, Select, Toggle } from "./UI";
 import { Port, InputPort, CVOutputPort, AudioOutputPort, AudioInputPort, CVInputPort, GateOutputPort, GateInputPort } from "./Ports";
-import { updateActiveModule } from "./main";
 import { GateNode } from "./Nodes";
+import { updateActiveModule } from "./main";
 
-
+const nameof = <T>(name: keyof T) => name;
 
 export interface Globals {
     draggedModule: Module | null;
@@ -31,7 +31,11 @@ export function updateConnectionPath(connection: Connection) {
     );
 }
 
-export abstract class Module {
+export interface RecordType {
+    [key: string]: any;
+}
+
+export abstract class Module implements RecordType {
     x: number;
     y: number;
     id: string;
@@ -44,7 +48,7 @@ export abstract class Module {
     constructor(public readonly globals: Globals, type: string, x: number, y: number) {
         this.x = x;
         this.y = y;
-        this.id = 'module_' + Math.random().toString(36).substr(2, 9);
+        this.id = 'module-' + self.crypto.randomUUID();
         this.inputConnections = [];
         this.outputConnections = [];
         this.ports = [];
@@ -102,6 +106,96 @@ export abstract class Module {
     }
 
     abstract stop(): void
+
+    serialize(): { [key: string]: string | number } {
+        return {
+            id: this.id,
+            type: this.constructor.name,
+            x: this.x,
+            y: this.y
+        }
+    }
+
+    static fromJSON(globals: Globals, m: any) {
+        switch (m.type) {
+            case "MultiplierModule":
+                return new MultiplierModule(globals, m.x, m.y, m.amount)
+
+            case "LFOModule":
+                return new LFOModule(globals, m.x, m.y, m.frequency, m.gain, m.oscType)
+
+            case "OSCModule":
+                return new OSCModule(globals, m.x, m.y, m.frequency, m.detune, m.gain, m.oscType)
+
+            case "VCAModule":
+                return new VCAModule(globals, m.x, m.y, m.gain)
+
+            case "MixerModule":
+                return new MixerModule(globals, m.x, m.y, m.gain)
+
+            case "MultiplierModule":
+                return new MultiplierModule(globals, m.x, m.y, m.amount)
+
+            case "SpeakerModule":
+                return new SpeakerModule(globals, m.x, m.y)
+
+            case "MIDIModule":
+                return new MIDIModule(globals, m.x, m.y)
+
+            case "ADSRModule":
+                return new ADSRModule(globals, m.x, m.y, m.attack, m.decay, m.sustain, m.release)
+
+            case "VCFModule":
+                return new VCFModule(globals, m.x, m.y, m.frequency, m.resonance)
+
+            default:
+                throw new Error("");
+                
+                
+        }
+
+    }
+}
+
+
+export class MultiplierModule extends Module {
+
+    scalingNode: GainNode
+    select: TextInput
+    cvInput: CVInputPort
+    cvOutput: CVOutputPort
+
+    constructor(globals: Globals, x: number, y: number, amount = "1") {
+        super(globals, "multiplier", x, y);
+
+        this.scalingNode = globals.audioContext.createGain();
+        this.scalingNode.gain.value = 1;
+
+        this.select = new TextInput(this, "Amount", amount, (e) => {
+            const num = Number.parseFloat((e.target as HTMLInputElement).value)
+
+            if (Number.isNaN(num))
+                return
+
+            if (!Number.isFinite(num))
+                return
+
+            this.scalingNode.gain.setValueAtTime(num, globals.audioContext.currentTime)
+        })
+
+        this.cvInput = new CVInputPort(this, "CV", nameof<MultiplierModule>("cvInput"), this.scalingNode)
+        this.cvOutput = new CVOutputPort(this, "CV", nameof<MultiplierModule>("cvOutput"), this.scalingNode)
+    }
+
+    stop(): void {
+        this.scalingNode.disconnect()
+    }
+
+    serialize() {
+        const m = super.serialize()
+        m.amount = this.select.getValue()
+        return m
+    }
 }
 
 
@@ -113,9 +207,9 @@ export class LFOModule extends Module {
     offsetNode: ConstantSourceNode
     knob: Knob
     select: Select
-    outputPort1: AudioOutputPort
+    cvOutput: CVOutputPort
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(globals: Globals, x: number, y: number, frequency = 0.3, gain = 1, oscType: OscillatorType = "sawtooth") {
         super(globals, "lfo", x, y);
         this.lfoNode = globals.audioContext.createOscillator();
         this.lfoNode.start()
@@ -133,14 +227,14 @@ export class LFOModule extends Module {
 
         // Connect the source to the gainNode, scaling it to [-0.5, 0.5]
         this.lfoNode.connect(this.scalingNode);
-        
+
         // Connect the gainNode and offsetNode to the audioContext’s destination
         this.adderNode = globals.audioContext.createGain(); // Used to sum the signals
         this.scalingNode.connect(this.adderNode);
         this.offsetNode.connect(this.adderNode);
         this.adderNode.connect(this.gainNode)
 
-        this.knob = new Knob(this, "Frequency", 0.3, (v) => {
+        this.knob = new Knob(this, "Frequency", frequency, (v) => {
             const value = Math.round(10 * v);
             this.lfoNode.frequency.setValueAtTime(value, globals.audioContext.currentTime)
         })
@@ -152,17 +246,17 @@ export class LFOModule extends Module {
         values.set("sawtooth", "Sawtooth")
         values.set("triangle", "Triangle")
 
-        this.knob = new Knob(this, "Gain", 1, (v) => {
+        this.knob = new Knob(this, "Gain", gain, (v) => {
             const value = v;
             this.gainNode.gain.setValueAtTime(value, globals.audioContext.currentTime)
         })
-        this.select = new Select(this, "Waveform", values, (v: OscillatorType) => {
+        this.select = new Select(this, "Waveform", values, oscType, (v: OscillatorType) => {
             this.lfoNode.type = v
         })
 
 
         // Only output port for number
-        this.outputPort1 = new AudioOutputPort(this, "Audio", this.gainNode)
+        this.cvOutput = new CVOutputPort(this, "CV", nameof<LFOModule>("cvOutput"), this.gainNode)
     }
 
     stop(): void {
@@ -173,19 +267,38 @@ export class LFOModule extends Module {
         this.offsetNode.disconnect(this.adderNode)
         this.adderNode.disconnect(this.gainNode)
     }
+
+    serialize() {
+        const m = super.serialize()
+        m.frequency = this.knob.getValue()
+        m.gain = this.knob.getValue()
+        m.oscType = this.select.getValue()
+        return m
+    }
 }
 
 export class OSCModule extends Module {
     oscNode: OscillatorNode
     gainNode: GainNode
-    knob: Knob
+    frequencyKnob: Knob
+    detuneKnob: Knob
+    gainKnob: Knob
     //toggle: Toggle
     select: Select
     audioOutput: AudioOutputPort
     pitchInput: CVInputPort
+    detuneInput: CVInputPort
     lfo: boolean
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(
+        globals: Globals,
+        x: number,
+        y: number,
+        frequency: number = 0,
+        detune: number = 0,
+        gain: number = 1,
+        oscType: OscillatorType = "sawtooth"
+    ) {
         super(globals, "osc", x, y);
         this.oscNode = globals.audioContext.createOscillator();
         this.oscNode.start()
@@ -193,59 +306,72 @@ export class OSCModule extends Module {
         this.oscNode.connect(this.gainNode)
 
         this.lfo = false;
-        this.knob = new Knob(this, "Frequency", 0.3, (v) => {
-                const value = 0;440 + Math.round(20 * Math.pow(1000, v));
-                this.oscNode.frequency.setValueAtTime(value, globals.audioContext.currentTime)
+        this.frequencyKnob = new Knob(this, "Frequency", frequency, (v) => {
+            const value = Math.round(Math.pow(10000, v));
+            this.oscNode.frequency.setValueAtTime(value, globals.audioContext.currentTime)
         })
-        this.knob = new Knob(this, "Gain", 1, (v) => {
+        this.detuneKnob = new Knob(this, "Detune", detune, (v) => {
+            this.oscNode.detune.setValueAtTime(v * 1200, globals.audioContext.currentTime)
+        })
+        this.gainKnob = new Knob(this, "Gain", gain, (v) => {
             const value = v;
             this.gainNode.gain.setValueAtTime(value, globals.audioContext.currentTime)
         })
 
         const values = new Map<OscillatorType, string>()
 
-        values.set("sine", "Sine")
-        values.set("square", "Square")
         values.set("sawtooth", "Sawtooth")
+        values.set("square", "Square")
         values.set("triangle", "Triangle")
+        values.set("sine", "Sine")
 
-        this.select = new Select(this, "Waveform", values, (v: OscillatorType) => {
+        this.select = new Select(this, "Waveform", values, oscType, (v: OscillatorType) => {
             this.oscNode.type = v
         })
 
 
         // Only output port for number
-        this.audioOutput = new AudioOutputPort(this, "Audio", this.gainNode)
+        this.audioOutput = new AudioOutputPort(this, "Audio", nameof<OSCModule>("audioOutput"), this.gainNode)
 
-        this.pitchInput = new CVInputPort(this, "Frequency Mod", this.oscNode.frequency);
+        this.pitchInput = new CVInputPort(this, "Frequency Mod", nameof<OSCModule>("pitchInput"), this.oscNode.frequency);
+        this.detuneInput = new CVInputPort(this, "Detune Mod", nameof<OSCModule>("detuneInput"), this.oscNode.detune);
     }
 
     stop(): void {
         this.oscNode.stop()
         this.oscNode.disconnect(this.gainNode)
     }
+
+    serialize() {
+        const m = super.serialize()
+        m.frequency = this.frequencyKnob.getValue()
+        m.detune = this.detuneKnob.getValue()
+        m.gain = this.gainKnob.getValue()
+        m.oscType = this.select.getValue()
+        return m
+    }
 }
 
 export class VCAModule extends Module {
     vca: GainNode
-    knob: Knob
+    gainKnob: Knob
     audioInput: AudioInputPort
     cvInput: CVInputPort
     audioOutput: AudioOutputPort
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(globals: Globals, x: number, y: number, gain: number = 0) {
         super(globals, "vca", x, y);
         this.vca = globals.audioContext.createGain();
-        this.vca.gain.setValueAtTime(0.5, globals.audioContext.currentTime);
+        this.vca.gain.setValueAtTime(gain, globals.audioContext.currentTime);
 
-        this.knob = new Knob(this, "Gain", 0.5, (v) => {
+        this.gainKnob = new Knob(this, "Gain", gain, (v) => {
             const value = v;
             this.vca.gain.setValueAtTime(value, globals.audioContext.currentTime)
         })
 
-        this.audioInput = new AudioInputPort(this, "Audio", this.vca)
-        this.cvInput = new CVInputPort(this, "Modulation", this.vca.gain)
-        this.audioOutput = new AudioOutputPort(this, "Audio", this.vca)
+        this.audioInput = new AudioInputPort(this, "Audio", nameof<VCAModule>("audioInput"), this.vca)
+        this.cvInput = new CVInputPort(this, "Modulation", nameof<VCAModule>("cvInput"), this.vca.gain)
+        this.audioOutput = new AudioOutputPort(this, "Audio", nameof<VCAModule>("audioOutput"),this.vca)
     }
 
     stop(): void {
@@ -255,6 +381,12 @@ export class VCAModule extends Module {
     onClick(e: MouseEvent): void {
     }
 
+    serialize(): { [key: string]: string | number; } {
+        const m = super.serialize()
+        m.gain = this.gainKnob.getValue()
+        return m
+    }
+
 
 }
 
@@ -262,18 +394,18 @@ export class MixerModule extends Module {
     gainNode1: GainNode
     gainNode2: GainNode
     merger: ChannelMergerNode
-    knob: Knob
-    inputPort1: AudioInputPort
-    inputPort2: AudioInputPort
-    outputPort1: AudioOutputPort
+    gainKnob: Knob
+    audioInput1: AudioInputPort
+    audioInput2: AudioInputPort
+    audioOutput: AudioOutputPort
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(globals: Globals, x: number, y: number, gain = 0.5) {
         super(globals, "mixer", x, y);
         this.gainNode1 = globals.audioContext.createGain();
         this.gainNode2 = globals.audioContext.createGain();
-        this.gainNode1.gain.setValueAtTime(0.5, globals.audioContext.currentTime);
-        this.gainNode2.gain.setValueAtTime(0.5, globals.audioContext.currentTime);
-        this.knob = new Knob(this, "Mix", 0.5, (v) => {
+        this.gainNode1.gain.setValueAtTime(gain, globals.audioContext.currentTime);
+        this.gainNode2.gain.setValueAtTime(1 - gain, globals.audioContext.currentTime);
+        this.gainKnob = new Knob(this, "Mix", gain, (v) => {
             const value = v;
             this.gainNode1.gain.setValueAtTime(value, globals.audioContext.currentTime)
             this.gainNode2.gain.setValueAtTime(1 - value, globals.audioContext.currentTime)
@@ -289,15 +421,21 @@ export class MixerModule extends Module {
         this.gainNode2.connect(this.merger, 0, 1)
 
 
-        this.inputPort1 = new AudioInputPort(this, "Audio", this.gainNode1)
-        this.inputPort2 = new AudioInputPort(this, "Audio", this.gainNode2)
-        this.outputPort1 = new AudioOutputPort(this, "Audio", this.merger)
+        this.audioInput1 = new AudioInputPort(this, "Audio", nameof<MixerModule>("audioInput1"), this.gainNode1)
+        this.audioInput2 = new AudioInputPort(this, "Audio", nameof<MixerModule>("audioInput2"), this.gainNode2)
+        this.audioOutput = new AudioOutputPort(this, "Audio", nameof<MixerModule>("audioOutput"),this.merger)
 
     }
 
     stop() {
         this.gainNode1.disconnect(this.merger)
         this.gainNode2.disconnect(this.merger)
+    }
+
+    serialize(): { [key: string]: string | number; } {
+        const m = super.serialize()
+        m.gain = this.gainKnob.getValue()
+        return m
     }
 }
 
@@ -306,7 +444,7 @@ export class SpeakerModule extends Module {
 
     constructor(globals: Globals, x: number, y: number) {
         super(globals, "speaker", x, y);
-        this.audioInput = new AudioInputPort(this, "Audio", globals.audioContext.destination)
+        this.audioInput = new AudioInputPort(this, "Audio", nameof<SpeakerModule>("audioInput"), globals.audioContext.destination)
     }
 
     stop(): void {
@@ -317,8 +455,10 @@ export class SpeakerModule extends Module {
 
 export class MIDIModule extends Module {
     pitchOutput: CVOutputPort;
+    pitchBendOutput: CVOutputPort;
     gateOutput: GateOutputPort;
     constantSource: ConstantSourceNode;
+    bendSource: ConstantSourceNode;
     gateNode: GateNode;
     gainNode: GainNode;
     activeNotes: number[] // Set to track active notes.
@@ -328,17 +468,21 @@ export class MIDIModule extends Module {
         super(globals, "midi", x, y);
         this.activeNotes = [];
 
+        this.bendSource = globals.audioContext.createConstantSource();
+        this.bendSource.start();
+        this.bendSource.offset.value = 0;
+
         this.constantSource = globals.audioContext.createConstantSource();
         this.constantSource.start();
         this.constantSource.offset.value = 1;
 
-        this.gateNode = new GateNode((on: boolean) => {})
+        this.gateNode = new GateNode((on: boolean) => { })
 
         this.gainNode = globals.audioContext.createGain();
         this.gainNode.gain.setValueAtTime(440, globals.audioContext.currentTime);
         this.constantSource.connect(this.gainNode);
 
-        this.button = new Button(this, "Play Note", 
+        this.button = new Button(this, "Play Note",
             (e) => {
                 this.handleNoteOn(68, 128)
             },
@@ -347,13 +491,18 @@ export class MIDIModule extends Module {
             }
         )
 
-        this.pitchOutput = new CVOutputPort(this, "Pitch CV", this.gainNode);
-        this.gateOutput = new GateOutputPort(this, "Gate", this.gateNode);
+        this.pitchBendOutput = new CVOutputPort(this, "Pitch Bend CV", nameof<MIDIModule>("pitchBendOutput"), this.bendSource);
+        this.pitchOutput = new CVOutputPort(this, "Pitch CV",nameof<MIDIModule>("pitchOutput"), this.gainNode);
+        this.gateOutput = new GateOutputPort(this, "Gate", nameof<MIDIModule>("gateOutput"), this.gateNode);
 
 
-        
+
     }
 
+
+    handlePitchBend(pitchBendValue: number, channel: number) {
+        this.bendSource.offset.setValueAtTime(pitchBendValue / 8192, this.globals.audioContext.currentTime)
+    }
 
     handleNoteOn(note: number, velocity: number) {
         // Add the note to active notes if it's not already present.
@@ -403,7 +552,15 @@ export class ADSRModule extends Module {
     sustainKnob: Knob;
     releaseKnob: Knob;
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(
+        globals: Globals,
+        x: number,
+        y: number,
+        private attack = 0.1,
+        private decay = 0.1,
+        private sustain = 0.5,
+        private release = 0.1
+    ) {
         super(globals, "adsr", x, y);
 
         this.constantNode = globals.audioContext.createConstantSource();
@@ -412,30 +569,35 @@ export class ADSRModule extends Module {
 
         this.gainNode = globals.audioContext.createGain();
         this.gainNode.gain.setValueAtTime(0, globals.audioContext.currentTime);
-        
+
         this.gateNode = new GateNode((on: boolean) => {
             this.handleTrigger(on);
         });
 
         this.constantNode.connect(this.gainNode)
 
-        // CVInputPort for trigger
-        this.gateInput = new GateInputPort(this, "Trigger", this.gateNode);
-        
-        // CVOutputPort for envelope
-        this.envelopeOutput = new CVOutputPort(this, "Envelope", this.gainNode);
 
         // Knobs for each ADSR parameter
-        this.attackKnob = new Knob(this, "Attack", 0.1, (value) => this.attackTime = value);
-        this.decayKnob = new Knob(this, "Decay", 0.1, (value) => this.decayTime = value);
-        this.sustainKnob = new Knob(this, "Sustain", 0.5, (value) => this.sustainLevel = value);
-        this.releaseKnob = new Knob(this, "Release", 0.1, (value) => this.releaseTime = value);
-    }
+        this.attackKnob = new Knob(this, "Attack", attack, (value) => {
+            this.attack = value
+        });
+        this.decayKnob = new Knob(this, "Decay", decay, (value) => {
+            this.decay = value
+        });
+        this.sustainKnob = new Knob(this, "Sustain", sustain, (value) => {
+            this.sustain = value
+        });
+        this.releaseKnob = new Knob(this, "Release", release, (value) => {
+            this.release = value
+        });
 
-    private attackTime: number = 0.1;
-    private decayTime: number = 0.1;
-    private sustainLevel: number = 0.5;
-    private releaseTime: number = 0.1;
+        // CVInputPort for trigger
+        this.gateInput = new GateInputPort(this, "Trigger", nameof<ADSRModule>("gateInput"), this.gateNode);
+
+        // CVOutputPort for envelope
+        this.envelopeOutput = new CVOutputPort(this, "Envelope", nameof<ADSRModule>("envelopeOutput"), this.gainNode);
+
+    }
 
     handleTrigger(on: boolean) {
         const now = this.globals.audioContext.currentTime;
@@ -443,14 +605,14 @@ export class ADSRModule extends Module {
             // Apply attack
             this.gainNode.gain.cancelScheduledValues(now);
             //this.gainNode.gain.setValueAtTime(0, now);
-            this.gainNode.gain.linearRampToValueAtTime(1, now + this.attackTime);
+            this.gainNode.gain.linearRampToValueAtTime(1, now + this.attack);
             // Apply decay
-            this.gainNode.gain.linearRampToValueAtTime(this.sustainLevel, now + this.attackTime + this.decayTime);
+            this.gainNode.gain.linearRampToValueAtTime(this.sustain, now + this.attack + this.decay);
         } else {
             // Apply release
             this.gainNode.gain.cancelScheduledValues(now);
             //this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
-            this.gainNode.gain.linearRampToValueAtTime(0, now + this.releaseTime);
+            this.gainNode.gain.linearRampToValueAtTime(0, now + this.release);
         }
     }
 
@@ -458,6 +620,15 @@ export class ADSRModule extends Module {
         this.constantNode.stop()
         this.constantNode.disconnect()
         this.gainNode.disconnect()
+    }
+
+    serialize(): { [key: string]: string | number; } {
+        const m = super.serialize()
+        m.attack = this.attackKnob.getValue()
+        m.decay = this.decayKnob.getValue()
+        m.sustain = this.sustainKnob.getValue()
+        m.release = this.releaseKnob.getValue()
+        return m
     }
 }
 
@@ -468,14 +639,14 @@ export class VCFModule extends Module {
     audioInput: AudioInputPort;
     audioOutput: AudioOutputPort;
     frequencyKnob: Knob;
-    resKnob: Knob;
+    resonanceKnob: Knob;
 
-    constructor(globals: Globals, x: number, y: number) {
+    constructor(globals: Globals, x: number, y: number, frequency = 0.5, resonance = 0.5) {
         super(globals, "vcf", x, y);
 
         this.gainNode = globals.audioContext.createGain()
-        this.gainNode.gain.value = 20000
-        
+        this.gainNode.gain.value = 10000
+
         // Create the filter node
         this.filterNode = globals.audioContext.createBiquadFilter();
         this.filterNode.type = 'lowpass'; // You can change this to match different filter types
@@ -484,31 +655,40 @@ export class VCFModule extends Module {
         this.gainNode.connect(this.filterNode.frequency)
 
         // Create a knob to control the base frequency of the filter
-        this.frequencyKnob = new Knob(this, "Frequency", 0.5, (value) => {
+        this.frequencyKnob = new Knob(this, "Frequency", frequency, (value) => {
             const frequency = 20 + value * 10000; // Map [0, 1] to [20, 10000] Hz
             this.filterNode.frequency.setValueAtTime(frequency, globals.audioContext.currentTime);
         });
 
-        this.resKnob = new Knob(this, "Resonance", 0.5, (value) => {
+        this.resonanceKnob = new Knob(this, "Resonance", resonance, (value) => {
             this.filterNode.Q.setValueAtTime(value * 5, globals.audioContext.currentTime);
         });
 
-        // Create a CV input port for frequency modulation
-        this.frequencyModInput = new CVInputPort(this, "Freq Mod", this.gainNode);
 
         // Create an audio input port
-        this.audioInput = new AudioInputPort(this, "Audio In", this.filterNode);
+        this.audioInput = new AudioInputPort(this, "Audio In",nameof<VCFModule>("audioInput"), this.filterNode);
+
+        // Create a CV input port for frequency modulation
+        this.frequencyModInput = new CVInputPort(this, "Freq Mod", nameof<VCFModule>("frequencyModInput"), this.gainNode);
 
         // Create an audio output port
-        this.audioOutput = new AudioOutputPort(this, "Audio Out", this.filterNode);
+        this.audioOutput = new AudioOutputPort(this, "Audio Out",nameof<VCFModule>("audioOutput"), this.filterNode);
 
 
     }
 
     stop(): void {
         this.filterNode.disconnect();
+        this.gainNode.disconnect()
     }
 
     onClick(e: MouseEvent): void {
+    }
+
+    serialize(): { [key: string]: string | number; } {
+        const m = super.serialize()
+        m.frequency = this.frequencyKnob.getValue()
+        m.resonance = this.resonanceKnob.getValue()
+        return m
     }
 }

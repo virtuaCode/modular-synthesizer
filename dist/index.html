@@ -9,17 +9,26 @@
 <body>
   <svg id="connections"></svg>
   <div id="toolbar">
-    <button onclick="start()">Setup</button>
-    <button onclick="addMIDIModule()">Add MIDI</button>
-    <button onclick="addOSCModule()">Add OSC</button>
-    <button onclick="addLFOModule()">Add LFO</button>
-    <button onclick="addVCAModule()">Add VCA</button>
-    <button onclick="addVCFModule()">Add VCF</button>
-    <button onclick="addADSRModule()">Add ADSR</button>
-    <button onclick="addMixerModule()">Add Mixer</button>
-    <button onclick="addSpeakerModule()">Add speaker</button>
+    <button  onclick="start()">Add Setup</button>
+    <button  onclick="save()">Save</button>
+    <button style="margin-right: 1rem;" onclick="load()">Load</button>
+    <button onclick="addMIDIModule()">MIDI</button>
+    <button onclick="addOSCModule()">OSC</button>
+    <button onclick="addLFOModule()">LFO</button>
+    <button onclick="addVCAModule()">VCA</button>
+    <button onclick="addVCFModule()">VCF</button>
+    <button onclick="addADSRModule()">ADSR</button>
+    <button onclick="addMixerModule()">Mixer</button>
+    <button onclick="addMultiplierModule()">Multiplier</button>
+    <button onclick="addSpeakerModule()">Speaker</button>
   </div>
 
+  <template id="template-input">
+    <div class="input-container">
+      <div class="label"></div>
+      <input type="text"/>
+    </div>
+  </template>
 
   <template id="template-button">
     <div class="button-container">
